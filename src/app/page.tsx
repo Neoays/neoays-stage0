@@ -1,103 +1,343 @@
-import Image from "next/image";
+"use client";
+import { useEffect, useState, useRef } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, createUserWithEmailAndPassword, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
+import { getFirestore, doc, getDoc, setDoc, setLogLevel } from 'firebase/firestore';
 
-export default function Home() {
+// Define the global Firebase variables and log level.
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const firebaseConfig = typeof __firebase_config !== 'undefined'
+  ? JSON.parse(__firebase_config)
+  : {
+      apiKey: "AIzaSyAQMkBJlQYnY8oQkdnqENfnkA9SU2k8Hjw",
+      authDomain: "neoays-stage0.firebaseapp.com",
+      projectId: "neoays-stage0",
+      storageBucket: "neoays-stage0.appspot.com",
+      messagingSenderId: "335928092721",
+      appId: "1:335928092721:web:f9a77840047dcdf0d4cd10",
+      measurementId: "G-NR6ZF1G6QE"
+    };
+const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+setLogLevel('debug');
+
+// Initialize Firebase services.
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+// Use crypto.randomUUID() for a temporary user ID if not authenticated.
+const getUserId = (user) => user?.uid || crypto.randomUUID();
+
+export default function App() {
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
+  const [isAvailable, setIsAvailable] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isReserved, setIsReserved] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [error, setError] = useState('');
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
+  const randomIdRef = useRef<string>(crypto.randomUUID());
+  const [randomId, setRandomId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!randomId) {
+      setRandomId(crypto.randomUUID());
+    }
+  }, [randomId]);
+
+  const userId = currentUser?.uid || randomId || "";
+
+  // Effect to handle initial auth state and listener.
+  useEffect(() => {
+    // Sign in with the custom token if provided.
+    const signIn = async () => {
+      try {
+        if (initialAuthToken) {
+          await signInWithCustomToken(auth, initialAuthToken);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (e) {
+        console.error("Firebase Auth Error:", e);
+        setError("Failed to authenticate. Please try again.");
+      }
+    };
+
+    // Set up the auth state observer.
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+
+    signIn();
+
+    // Clean up the subscription on unmount.
+    return () => unsubscribe();
+  }, [auth]);
+
+  // Function to check if the username is available in the public Firestore collection.
+  const checkUsername = async () => {
+    if (username.length < 3) {
+      setIsAvailable(false);
+      setError("Username must be at least 3 characters long.");
+      return;
+    }
+    setError('');
+    setIsLoading(true);
+    setIsAvailable(null);
+
+    try {
+      const usernameDocPath = `/artifacts/${appId}/public/data/usernames/${username}`;
+      const docRef = doc(db, usernameDocPath);
+      const docSnap = await getDoc(docRef);
+
+      setIsAvailable(!docSnap.exists());
+    } catch (e) {
+      console.error("Error checking username:", e);
+      if (e.code === 'unavailable' || e.message?.includes('offline')) {
+        setError("Cannot check username while offline. Please check your internet connection.");
+      } else {
+        setError("An error occurred while checking the username.");
+      }
+      setIsAvailable(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Function to reserve the username by creating a public document.
+  const reserveUsername = async () => {
+    if (!currentUser) {
+      setError("You must be signed in to reserve a username.");
+      return;
+    }
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const usernameDocPath = `/artifacts/${appId}/public/data/usernames/${username}`;
+      const docRef = doc(db, usernameDocPath);
+
+      // Save the username and link it to the current user's ID.
+      await setDoc(docRef, { userId: currentUser.uid });
+      setIsReserved(true);
+    } catch (e) {
+      console.error("Error reserving username:", e);
+      setError("Failed to reserve the username. It might be taken.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Function to create a new user with email and password, and save mobile number.
+  const handleSignUp = async () => {
+    if (!email || !password || !mobileNumber) {
+      setError("All fields are required.");
+      return;
+    }
+    if (!privacyAccepted) {
+      setError("You must accept the privacy policy to continue.");
+      return;
+    }
+    setIsLoading(true);
+    setError('');
+
+    try {
+      // Create a new user with email and password.
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Update the public username record with the new user ID if it was created anonymously.
+      if (currentUser && currentUser.isAnonymous) {
+        const usernameDocPath = `/artifacts/${appId}/public/data/usernames/${username}`;
+        const docRef = doc(db, usernameDocPath);
+        await setDoc(docRef, { userId: user.uid }, { merge: true });
+      }
+
+      // Save the user's mobile number and reserved username to their private Firestore profile.
+      const profileDocPath = `/artifacts/${appId}/users/${user.uid}/profile/data`;
+      const profileRef = doc(db, profileDocPath);
+      await setDoc(profileRef, {
+        username: username,
+        email: email,
+        mobileNumber: mobileNumber,
+      });
+
+      // Show a success message.
+      alert("Sign-up successful! Your Neoays ID is reserved.");
+      setIsReserved(false); // Reset state to show the success message.
+
+    } catch (e) {
+      console.error("Error during sign-up:", e);
+      // Handle different Firebase auth errors.
+      if (e.code === 'auth/email-already-in-use') {
+        setError("This email is already in use. Please sign in or use a different email.");
+      } else if (e.code === 'auth/weak-password') {
+        setError("Password is too weak. Please use a stronger password.");
+      } else {
+        setError(`Sign-up failed: ${e.message}`);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4 font-sans">
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-lg">
+        {/* Header */}
+        <h1 className="mb-2 text-3xl font-bold text-gray-800">
+          Reserve your Neoays ID
+        </h1>
+        <p className="mb-6 text-gray-600">
+          Check and reserve your unique username.
+        </p>
+        {userId && (
+          <p className="mb-4 text-xs font-mono text-gray-400">
+            Your User ID: {userId}
+          </p>
+        )}
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+        {/* Dynamic Content based on state */}
+        {!isReserved ? (
+          <>
+            {/* Username Check Form */}
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value.toLowerCase())}
+              placeholder="Enter your desired username"
+              className="w-full rounded-lg border border-gray-300 p-3 text-center transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isLoading}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            <button
+              onClick={checkUsername}
+              disabled={isLoading || username.length < 3}
+              className="mt-4 w-full rounded-lg bg-blue-500 px-4 py-3 font-semibold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-blue-300"
+            >
+              {isLoading ? "Checking..." : "Check Availability"}
+            </button>
+
+            {/* Status Messages */}
+            {isLoading && (
+              <p className="mt-4 text-gray-500 animate-pulse">
+                Checking database...
+              </p>
+            )}
+            {isAvailable !== null && !isLoading && (
+              <div className="mt-4">
+                {isAvailable ? (
+                  <div className="text-green-600 font-medium">
+                    <p>✅ Username is available!</p>
+                    <button
+                      onClick={reserveUsername}
+                      className="mt-2 w-full rounded-lg bg-green-500 px-4 py-3 font-semibold text-white transition hover:bg-green-600"
+                    >
+                      Reserve Now
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-red-600 font-medium">
+                    ❌ That name is taken or too short.
+                  </p>
+                )}
+              </div>
+            )}
+            {error && (
+              <p className="mt-4 text-red-500 font-medium">{error}</p>
+            )}
+          </>
+        ) : (
+          <>
+            {/* Signup Form */}
+            <p className="mb-4 text-lg font-medium text-blue-600">
+              Username <span className="font-bold">@{username}</span> is
+              reserved.
+            </p>
+            <p className="mb-4 text-sm text-gray-600">
+              Complete your profile to secure your ID.
+            </p>
+
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Your Email Address"
+              className="w-full rounded-lg border border-gray-300 p-3 mb-2 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isLoading}
+            />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Choose a Password"
+              className="w-full rounded-lg border border-gray-300 p-3 mb-2 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isLoading}
+            />
+            <input
+              type="tel"
+              value={mobileNumber}
+              onChange={(e) => setMobileNumber(e.target.value)}
+              placeholder="Mobile Number"
+              className="w-full rounded-lg border border-gray-300 p-3 mb-4 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isLoading}
+            />
+
+            <div className="flex items-center justify-center mb-4">
+              <input
+                type="checkbox"
+                id="privacy"
+                checked={privacyAccepted}
+                onChange={() => setPrivacyAccepted(!privacyAccepted)}
+                className="rounded-md border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label htmlFor="privacy" className="ml-2 text-sm text-gray-600">
+                I accept the{" "}
+                <span
+                  onClick={() => setIsPrivacyModalOpen(true)}
+                  className="text-blue-500 hover:underline cursor-pointer"
+                >
+                  Privacy Policy
+                </span>
+              </label>
+            </div>
+            <button
+              onClick={handleSignUp}
+              disabled={isLoading || !privacyAccepted}
+              className="w-full rounded-lg bg-blue-500 px-4 py-3 font-semibold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-blue-300"
+            >
+              {isLoading ? "Signing Up..." : "Complete Sign Up"}
+            </button>
+            {error && (
+              <p className="mt-4 text-red-500 font-medium">{error}</p>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Privacy Policy Modal */}
+      {isPrivacyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="w-full max-w-lg rounded-xl bg-white p-8 shadow-lg">
+            <h2 className="mb-4 text-xl font-bold">Privacy Policy</h2>
+            <p className="text-gray-700">
+              Your email address and mobile number are collected to facilitate
+              communication and account recovery. Your username is stored publicly
+              to ensure its uniqueness. We use Firebase services to securely
+              store your data. Your mobile number will be used for account-related
+              notifications and security. We will not sell your data.
+            </p>
+            <button
+              onClick={() => setIsPrivacyModalOpen(false)}
+              className="mt-6 w-full rounded-lg bg-blue-500 px-4 py-2 font-semibold text-white transition hover:bg-blue-600"
+            >
+              Close
+            </button>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      )}
     </div>
   );
 }

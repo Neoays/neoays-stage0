@@ -18,4 +18,11 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+
+// neoays: Only initialize analytics in the browser
+let analytics: ReturnType<typeof getAnalytics> | undefined = undefined;
+if (typeof window !== "undefined") {
+  analytics = getAnalytics(app);
+}
+
+export { app, analytics };
