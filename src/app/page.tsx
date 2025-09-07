@@ -1,23 +1,22 @@
 "use client";
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, createUserWithEmailAndPassword, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, createUserWithEmailAndPassword, User } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, setLogLevel } from 'firebase/firestore';
+import type { FirebaseError } from 'firebase/app';
 
-// Define the global Firebase variables and log level.
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-const firebaseConfig = typeof __firebase_config !== 'undefined'
-  ? JSON.parse(__firebase_config)
-  : {
-      apiKey: "AIzaSyAQMkBJlQYnY8oQkdnqENfnkA9SU2k8Hjw",
-      authDomain: "neoays-stage0.firebaseapp.com",
-      projectId: "neoays-stage0",
-      storageBucket: "neoays-stage0.appspot.com",
-      messagingSenderId: "335928092721",
-      appId: "1:335928092721:web:f9a77840047dcdf0d4cd10",
-      measurementId: "G-NR6ZF1G6QE"
-    };
-const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+// Define the global Firebase variables. These are automatically provided by the environment.
+const appId = process.env.NEXT_PUBLIC_APP_ID || 'neoays-stage0';
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID!,
+};
+const initialAuthToken = null;
 setLogLevel('debug');
 
 // Initialize Firebase services.
@@ -25,23 +24,20 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Use crypto.randomUUID() for a temporary user ID if not authenticated.
-const getUserId = (user) => user?.uid || crypto.randomUUID();
-
 export default function App() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
-  const [isAvailable, setIsAvailable] = useState(null);
+  const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isReserved, setIsReserved] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [error, setError] = useState('');
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
-  const randomIdRef = useRef<string>(crypto.randomUUID());
-  const [randomId, setRandomId] = useState<string | null>(null);
+  const [isSignUpSuccessful, setIsSignUpSuccessful] = useState(false);
+  const [randomId, setRandomId] = useState("");
 
   useEffect(() => {
     if (!randomId) {
@@ -49,9 +45,9 @@ export default function App() {
     }
   }, [randomId]);
 
+  // Use the authenticated user ID, or a stable random ID after mount
   const userId = currentUser?.uid || randomId || "";
 
-  // Effect to handle initial auth state and listener.
   useEffect(() => {
     // Sign in with the custom token if provided.
     const signIn = async () => {
@@ -76,7 +72,7 @@ export default function App() {
 
     // Clean up the subscription on unmount.
     return () => unsubscribe();
-  }, [auth]);
+  }, []);
 
   // Function to check if the username is available in the public Firestore collection.
   const checkUsername = async () => {
@@ -96,11 +92,23 @@ export default function App() {
 
       setIsAvailable(!docSnap.exists());
     } catch (e) {
-      console.error("Error checking username:", e);
-      if (e.code === 'unavailable' || e.message?.includes('offline')) {
-        setError("Cannot check username while offline. Please check your internet connection.");
+      const err = e as FirebaseError;
+      console.error("Error checking username:", err);
+      if (
+        typeof err === "object" &&
+        err !== null &&
+        typeof err.code === "string"
+      ) {
+        if (
+          err.code === "unavailable" ||
+          (err.message && err.message.includes("offline"))
+        ) {
+          setError("Cannot check username while offline. Please check your internet connection.");
+        } else {
+          setError("An error occurred while checking the username.");
+        }
       } else {
-        setError("An error occurred while checking the username.");
+        setError("An unknown error occurred while checking the username.");
       }
       setIsAvailable(false);
     } finally {
@@ -167,18 +175,26 @@ export default function App() {
       });
 
       // Show a success message.
-      alert("Sign-up successful! Your Neoays ID is reserved.");
-      setIsReserved(false); // Reset state to show the success message.
+      setIsSignUpSuccessful(true);
+      setIsReserved(false); // Reset state to hide the form.
 
     } catch (e) {
-      console.error("Error during sign-up:", e);
-      // Handle different Firebase auth errors.
-      if (e.code === 'auth/email-already-in-use') {
-        setError("This email is already in use. Please sign in or use a different email.");
-      } else if (e.code === 'auth/weak-password') {
-        setError("Password is too weak. Please use a stronger password.");
+      const err = e as FirebaseError;
+      console.error("Error during sign-up:", err);
+      if (
+        typeof err === "object" &&
+        err !== null &&
+        typeof err.code === "string"
+      ) {
+        if (err.code === 'auth/email-already-in-use') {
+          setError("This email is already in use. Please sign in or use a different email.");
+        } else if (err.code === 'auth/weak-password') {
+          setError("Password is too weak. Please use a stronger password.");
+        } else {
+          setError(`Sign-up failed: ${err.message}`);
+        }
       } else {
-        setError(`Sign-up failed: ${e.message}`);
+        setError("An unknown error occurred during sign-up.");
       }
     } finally {
       setIsLoading(false);
@@ -200,120 +216,127 @@ export default function App() {
             Your User ID: {userId}
           </p>
         )}
-
-        {/* Dynamic Content based on state */}
-        {!isReserved ? (
-          <>
-            {/* Username Check Form */}
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value.toLowerCase())}
-              placeholder="Enter your desired username"
-              className="w-full rounded-lg border border-gray-300 p-3 text-center transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={isLoading}
-            />
-            <button
-              onClick={checkUsername}
-              disabled={isLoading || username.length < 3}
-              className="mt-4 w-full rounded-lg bg-blue-500 px-4 py-3 font-semibold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-blue-300"
-            >
-              {isLoading ? "Checking..." : "Check Availability"}
-            </button>
-
-            {/* Status Messages */}
-            {isLoading && (
-              <p className="mt-4 text-gray-500 animate-pulse">
-                Checking database...
-              </p>
-            )}
-            {isAvailable !== null && !isLoading && (
-              <div className="mt-4">
-                {isAvailable ? (
-                  <div className="text-green-600 font-medium">
-                    <p>✅ Username is available!</p>
-                    <button
-                      onClick={reserveUsername}
-                      className="mt-2 w-full rounded-lg bg-green-500 px-4 py-3 font-semibold text-white transition hover:bg-green-600"
-                    >
-                      Reserve Now
-                    </button>
-                  </div>
-                ) : (
-                  <p className="text-red-600 font-medium">
-                    ❌ That name is taken or too short.
-                  </p>
-                )}
-              </div>
-            )}
-            {error && (
-              <p className="mt-4 text-red-500 font-medium">{error}</p>
-            )}
-          </>
-        ) : (
-          <>
-            {/* Signup Form */}
-            <p className="mb-4 text-lg font-medium text-blue-600">
-              Username <span className="font-bold">@{username}</span> is
-              reserved.
-            </p>
-            <p className="mb-4 text-sm text-gray-600">
-              Complete your profile to secure your ID.
-            </p>
-
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Your Email Address"
-              className="w-full rounded-lg border border-gray-300 p-3 mb-2 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={isLoading}
-            />
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Choose a Password"
-              className="w-full rounded-lg border border-gray-300 p-3 mb-2 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={isLoading}
-            />
-            <input
-              type="tel"
-              value={mobileNumber}
-              onChange={(e) => setMobileNumber(e.target.value)}
-              placeholder="Mobile Number"
-              className="w-full rounded-lg border border-gray-300 p-3 mb-4 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={isLoading}
-            />
-
-            <div className="flex items-center justify-center mb-4">
-              <input
-                type="checkbox"
-                id="privacy"
-                checked={privacyAccepted}
-                onChange={() => setPrivacyAccepted(!privacyAccepted)}
-                className="rounded-md border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <label htmlFor="privacy" className="ml-2 text-sm text-gray-600">
-                I accept the{" "}
-                <span
-                  onClick={() => setIsPrivacyModalOpen(true)}
-                  className="text-blue-500 hover:underline cursor-pointer"
-                >
-                  Privacy Policy
-                </span>
-              </label>
+        {isSignUpSuccessful ? (
+            <div className="text-green-600 font-medium text-lg mt-4 animate-fade-in">
+              ✅ Your Neoays ID is reserved! Welcome!
             </div>
-            <button
-              onClick={handleSignUp}
-              disabled={isLoading || !privacyAccepted}
-              className="w-full rounded-lg bg-blue-500 px-4 py-3 font-semibold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-blue-300"
-            >
-              {isLoading ? "Signing Up..." : "Complete Sign Up"}
-            </button>
-            {error && (
-              <p className="mt-4 text-red-500 font-medium">{error}</p>
-            )}
-          </>
+        ) : (
+            <>
+              {/* Dynamic Content based on state */}
+              {!isReserved ? (
+                <>
+                  {/* Username Check Form */}
+                  <input
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value.toLowerCase())}
+                    placeholder="Enter your desired username"
+                    className="w-full rounded-lg border border-gray-300 p-3 text-center transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isLoading}
+                  />
+                  <button
+                    onClick={checkUsername}
+                    disabled={isLoading || username.length < 3}
+                    className="mt-4 w-full rounded-lg bg-blue-500 px-4 py-3 font-semibold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-blue-300"
+                  >
+                    {isLoading ? "Checking..." : "Check Availability"}
+                  </button>
+
+                  {/* Status Messages */}
+                  {isLoading && (
+                    <p className="mt-4 text-gray-500 animate-pulse">
+                      Checking database...
+                    </p>
+                  )}
+                  {isAvailable !== null && !isLoading && (
+                    <div className="mt-4">
+                      {isAvailable ? (
+                        <div className="text-green-600 font-medium">
+                          <p>✅ Username is available!</p>
+                          <button
+                            onClick={reserveUsername}
+                            className="mt-2 w-full rounded-lg bg-green-500 px-4 py-3 font-semibold text-white transition hover:bg-green-600"
+                          >
+                            Reserve Now
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-red-600 font-medium">
+                          ❌ That name is taken or too short.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {error && (
+                    <p className="mt-4 text-red-500 font-medium">{error}</p>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* Signup Form */}
+                  <p className="mb-4 text-lg font-medium text-blue-600">
+                    Username <span className="font-bold">@{username}</span> is
+                    reserved.
+                  </p>
+                  <p className="mb-4 text-sm text-gray-600">
+                    Complete your profile to secure your ID.
+                  </p>
+
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Your Email Address"
+                    className="w-full rounded-lg border border-gray-300 p-3 mb-2 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isLoading}
+                  />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Choose a Password"
+                    className="w-full rounded-lg border border-gray-300 p-3 mb-2 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isLoading}
+                  />
+                  <input
+                    type="tel"
+                    value={mobileNumber}
+                    onChange={(e) => setMobileNumber(e.target.value)}
+                    placeholder="Mobile Number"
+                    className="w-full rounded-lg border border-gray-300 p-3 mb-4 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isLoading}
+                  />
+
+                  <div className="flex items-center justify-center mb-4">
+                    <input
+                      type="checkbox"
+                      id="privacy"
+                      checked={privacyAccepted}
+                      onChange={() => setPrivacyAccepted(!privacyAccepted)}
+                      className="rounded-md border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <label htmlFor="privacy" className="ml-2 text-sm text-gray-600">
+                      I accept the{" "}
+                      <span
+                        onClick={() => setIsPrivacyModalOpen(true)}
+                        className="text-blue-500 hover:underline cursor-pointer"
+                      >
+                        Privacy Policy
+                      </span>
+                    </label>
+                  </div>
+                  <button
+                    onClick={handleSignUp}
+                    disabled={isLoading || !privacyAccepted}
+                    className="w-full rounded-lg bg-blue-500 px-4 py-3 font-semibold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-blue-300"
+                  >
+                    {isLoading ? "Signing Up..." : "Complete Sign Up"}
+                  </button>
+                  {error && (
+                    <p className="mt-4 text-red-500 font-medium">{error}</p>
+                  )}
+                </>
+              )}
+            </>
         )}
       </div>
 
