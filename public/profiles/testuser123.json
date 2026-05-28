@@ -1,0 +1,13 @@
+{
+  "username": "testuser123",
+  "nEliteRedirectEnabled": false,
+  "profileType": "personal",
+  "displayName": "testuser123",
+  "mobileNumber": "",
+  "photoURL": "",
+  "themeId": "modern-gradient",
+  "themeSettings": {
+    "layoutStyle": "default",
+    "primaryColor": "#4f46e5"
+  }
+}

@@ -1,0 +1,179 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ADMIN CHECK HELPER
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.uid == 'B8kCoE9Yz8g8uhIHqU2I1f447wK2' || 
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.exists == true
+      );
+    }
+
+    // PUBLIC ACCESS: Allow anyone to read user profiles
+    match /users/{userId} {
+      allow read: if true;
+      // OWNER OR ADMIN: Only the user or an admin can edit/delete
+      allow write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      
+      match /connections/{connectionId} {
+        allow read, write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      }
+
+      match /stats/{docId} {
+        allow read: if true;
+        allow create, update: if true; 
+        allow delete: if isAdmin();
+      }
+      
+      match /orders/{orderId} {
+        allow read: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+        allow create: if true;
+        allow update, delete: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      }
+      
+      match /leads/{leadId} {
+        allow create: if true; // Public can submit leads
+        allow read, update, delete: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      }
+      
+      match /appointments/{apptId} {
+        allow create: if true; // Public can book appointments
+        allow read, update, delete: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      }
+      
+      match /testimonials/{testimonialId} {
+        allow create: if true; // Public can submit testimonials
+        allow read: if true; // Public can view approved testimonials
+        allow update, delete: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      }
+      
+      match /portfolio_items/{itemId} {
+        allow read: if true; // Public can view portfolio
+        allow write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      }
+    }
+    
+    // PUBLIC PROFILES: Isolated collection for public display
+    match /public_profiles/{userId} {
+      allow read: if true;
+      allow write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+    }
+    
+    // USERNAMES MAPPING - Public read, owner can create/update/delete
+    match /usernames/{username} {
+      allow read: if true;
+      allow create: if request.auth != null && (
+        request.resource.data.userId == request.auth.uid || 
+        request.resource.data.ownerId == request.auth.uid
+      );
+      allow update, delete: if isAdmin() || (request.auth != null && (
+        resource.data.userId == request.auth.uid || 
+        resource.data.ownerId == request.auth.uid
+      ));
+    }
+
+    // MOBILE NUMBERS MAPPING (for mobile-based login)
+    match /mobiles/{mobile} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
+    }
+
+    // BUSINESS PROFILES - Public read, owner controls write
+    match /profiles/{profileId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isAdmin() || (request.auth != null && resource.data.ownerId == request.auth.uid);
+      
+      match /stats/{docId} {
+        allow read: if true;
+        allow create, update: if true; 
+        allow delete: if isAdmin();
+      }
+      
+      // Menu items and products nested under profile
+      match /menuItems/{itemId} {
+        allow read: if true;
+        allow write: if isAdmin() || (request.auth != null && get(/databases/$(database)/documents/profiles/$(profileId)).data.ownerId == request.auth.uid);
+      }
+      
+      match /productItems/{itemId} {
+        allow read: if true;
+        allow write: if isAdmin() || (request.auth != null && get(/databases/$(database)/documents/profiles/$(profileId)).data.ownerId == request.auth.uid);
+      }
+    }
+
+    // FEEDBACK COLLECTION
+    match /feedback/{feedbackId} {
+      allow create: if true;
+      allow read, delete: if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
+      allow list: if isAdmin() || (request.auth != null && request.query.limit <= 100 && resource.data.userId == request.auth.uid);
+    }
+
+    // VOUCHER CLAIMS
+    match /voucher_claims/{claimId} {
+      allow create: if request.auth != null;
+      allow read: if isAdmin() || (request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        get(/databases/$(database)/documents/profiles/$(resource.data.merchantId)).data.ownerId == request.auth.uid ||
+        (resource.data.redeemedBy != null && get(/databases/$(database)/documents/profiles/$(resource.data.redeemedBy)).data.ownerId == request.auth.uid)
+      // Staff kiosk: allow read if staffAccessEnabled for the merchant
+      )) || (
+        resource.data.merchantId != null &&
+        get(/databases/$(database)/documents/profiles/$(resource.data.merchantId)).data.staffAccessEnabled == true
+      );
+      allow update: if isAdmin() || (request.auth != null && (
+         get(/databases/$(database)/documents/profiles/$(resource.data.merchantId)).data.ownerId == request.auth.uid ||
+         (request.resource.data.redeemedBy != null && get(/databases/$(database)/documents/profiles/$(request.resource.data.redeemedBy)).data.ownerId == request.auth.uid)
+      // Staff kiosk: allow status update to 'redeemed' if staffAccessEnabled
+      )) || (
+        request.resource.data.status == 'redeemed' &&
+        request.resource.data.redeemedVia == 'staff_kiosk' &&
+        resource.data.merchantId != null &&
+        get(/databases/$(database)/documents/profiles/$(resource.data.merchantId)).data.staffAccessEnabled == true
+      );
+      allow delete: if isAdmin() || (request.auth != null && get(/databases/$(database)/documents/profiles/$(resource.data.merchantId)).data.ownerId == request.auth.uid);
+    }
+    
+    // ADMINS COLLECTION
+    match /admins/{adminId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Only manageable via Firebase Console
+    }
+
+    // NSALES QR CODES - Public access for sales portal
+    match /nsales_qr_codes/{qrId} {
+      allow read, write: if true;
+    }
+
+    // CONNECTIONS - Public write for anonymous connect feature
+    match /connections/{connectionId} {
+      allow read, write: if true;
+    }
+
+    // ORDERS - Global orders collection
+    match /orders/{orderId} {
+      allow create: if true;
+      allow read: if isAdmin() || (request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.merchantId == request.auth.uid
+      ));
+      allow update, delete: if isAdmin() || (request.auth != null && resource.data.merchantId == request.auth.uid);
+    }
+
+    // SURVEYS COLLECTION - Business owners can CRUD their surveys
+    match /surveys/{surveyId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isAdmin() || (request.auth != null && resource.data.ownerId == request.auth.uid);
+    }
+
+    // SURVEY RESPONSES - Anyone can submit, business owners can read their responses
+    match /surveyResponses/{responseId} {
+      allow create: if true;
+      allow read: if isAdmin() || (request.auth != null && resource.data.ownerId == request.auth.uid);
+      allow update, delete: if isAdmin() || (request.auth != null && resource.data.ownerId == request.auth.uid);
+    }
+  }
+}

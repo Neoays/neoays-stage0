@@ -1,0 +1,243 @@
+/* ImmersiveProfile.css */
+.immersive-container {
+    height: 100vh;
+    width: 100%;
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+    background: #000;
+    color: white;
+    font-family: 'Inter', sans-serif;
+    position: relative;
+}
+
+.immersive-section {
+    height: 100vh;
+    width: 100%;
+    scroll-snap-align: start;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.immersive-overlay {
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.6) 50%, rgba(0, 0, 0, 0) 100%);
+    padding: 2rem;
+    padding-bottom: 5rem;
+    /* Space for bottom navigation if any */
+    animation: fadeInUp 0.8s ease-out;
+}
+
+.profile-identity h1 {
+    font-size: 3rem;
+    font-weight: 800;
+    margin: 0;
+    line-height: 1.1;
+    text-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.profile-identity .designation {
+    font-size: 1.25rem;
+    color: #ffd700;
+    /* Goldish highlight */
+    font-weight: 500;
+    margin-top: 0.5rem;
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(4px);
+    padding: 0.25rem 0.75rem;
+    border-radius: 99px;
+}
+
+.bio-text {
+    font-size: 1rem;
+    opacity: 0.9;
+    max-width: 600px;
+    margin-top: 1rem;
+    line-height: 1.6;
+}
+
+/* Action Buttons Grid */
+.immersive-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+    flex-wrap: wrap;
+}
+
+.action-btn {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.action-btn:hover {
+    background: white;
+    color: black;
+    transform: translateY(-2px);
+}
+
+.action-btn.primary {
+    background: white;
+    color: black;
+}
+
+/* Timeline Experience Section */
+.experience-timeline {
+    margin-top: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+}
+
+.exp-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: rgba(20, 20, 20, 0.6);
+    backdrop-filter: blur(12px);
+    padding: 1rem;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.exp-logo {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: white;
+}
+
+.exp-details {
+    flex: 1;
+}
+
+.exp-role {
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.exp-company {
+    font-size: 0.9rem;
+    opacity: 0.8;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.country-flag {
+    font-size: 1.2rem;
+}
+
+.current-badge {
+    font-size: 0.7rem;
+    background: #22c55e;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: auto;
+}
+
+/* Linked Profiles Row */
+.linked-profiles-row {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    padding: 1rem 0;
+    margin-top: 1rem;
+}
+
+.linked-profile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 80px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.linked-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    object-fit: cover;
+    margin-bottom: 0.5rem;
+}
+
+.linked-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.linked-relation {
+    font-size: 0.7rem;
+    opacity: 0.7;
+}
+
+/* Multi-contact list */
+.contact-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+}
+
+.contact-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 0.6rem 1rem;
+    border-radius: 50px;
+    font-size: 0.9rem;
+    text-decoration: none;
+    color: white;
+    transition: background 0.2s;
+}
+
+.contact-pill:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Scrollbar Hide */
+.experience-timeline::-webkit-scrollbar,
+.linked-profiles-row::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+
+.experience-timeline::-webkit-scrollbar-thumb,
+.linked-profiles-row::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}

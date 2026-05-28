@@ -1,0 +1,11 @@
+{
+  "profileType": "business",
+  "displayName": "Blackcup",
+  "mobileNumber": "",
+  "photoURL": "",
+  "themeId": "corporate-blue",
+  "themeSettings": {
+    "layoutStyle": "floating",
+    "primaryColor": "#0ea5e9"
+  }
+}

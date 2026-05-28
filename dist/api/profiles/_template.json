@@ -1,0 +1,9 @@
+{
+    "displayName": "John Doe",
+    "mobileNumber": "+97112345678",
+    "photoURL": "https://example.com/photo.jpg",
+    "profileType": "personal",
+    "themeSettings": {
+        "primaryColor": "#4f46e5"
+    }
+}

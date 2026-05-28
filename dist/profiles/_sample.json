@@ -1,0 +1,10 @@
+{
+    "displayName": "Sample User",
+    "mobileNumber": "+97112345678",
+    "photoURL": "",
+    "themeId": "modern-gradient",
+    "themeSettings": {
+        "layoutStyle": "default",
+        "primaryColor": "#4f46e5"
+    }
+}

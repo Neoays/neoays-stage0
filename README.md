@@ -1,70 +1,137 @@
-# Getting Started with Create React App
+# Neoays - Digital Profile Platform
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+NFC-powered digital profiles and business cards with instant sharing.
 
-## Available Scripts
+## Quick Start
 
-In the project directory, you can run:
+```bash
+# Install dependencies
+npm install
 
-### `npm start`
+# Development
+npm start
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+# Production build & deploy
+npm run deploy
+```
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Features
 
-### `npm test`
+### 🎯 Core Features
+- **Digital Profiles** - Personal, Business, Professional profile types
+- **NFC Integration** - Tap to share with NFC cards
+- **QR Code Sharing** - Generate and share QR codes
+- **Custom Themes** - Multiple layouts (Lumia, Bento, Glass, Dark Elegance, Modern Gradient)
+- **Color Customization** - User-defined primary colors
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### 📱 Profile Components
+- **Display Name** - Editable name
+- **Bio** - Short description (200 chars)
+- **Designation/Title** - Professional title
+- **Location** - Geographic location
+- **Works At** - Link to company profiles
+- **Photo & Cover** - Profile and cover images
+- **Gallery** - Photo gallery support
+- **Links** - Social media, website, contact links
 
-### `npm run build`
+### 🚀 Contact Features
+- **WhatsApp Button** - Instant WhatsApp contact
+- **Save Contact** - Download vCard
+- **Connect Button** - Save to connections
+- **Direct Call** - Click to call
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### ⚡ Performance
+- **CDN Static Profiles** - ~50ms instant loading
+- **Theme-Aware Skeletons** - Matching placeholder during load
+- **LocalStorage Cache** - 1-hour client cache
+- **Lazy Loading** - Components load on demand
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### 🎨 Layouts
+1. **Modern Gradient** - Default gradient background
+2. **Lumia Tiles** - Colorful tile grid
+3. **Bento Grid** - Modern card layout
+4. **Glass Floating** - Glassmorphism effect
+5. **Dark Elegance** - Premium dark theme
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### 🔧 Dashboard (nProducts)
+- **nProfile** - Profile management
+- **nWallet** - Digital wallet (coming soon)
+- **nClaim** - Voucher claiming
+- **nShop** - Product catalog
+- **nMenu** - Restaurant menus
+- **nReview** - Reviews (coming soon)
 
-### `npm run eject`
+## Project Structure
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```
+src/
+├── components/         # Reusable UI components
+│   ├── layouts/        # Theme layout components
+│   ├── ProfileSkeleton.tsx
+│   ├── WhatsAppButton.tsx
+│   └── ...
+├── features/           # Feature modules
+│   ├── nProfile/       # Profile management
+│   ├── nClaim/         # Voucher system
+│   ├── nShop/          # Shop/catalog
+│   └── dashboard/      # Dashboard components
+├── page_views/         # Route pages
+├── services/           # Firebase config
+├── contexts/           # React contexts
+├── hooks/              # Custom hooks
+└── types/              # TypeScript types
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Deployment
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### Prerequisites
+1. Firebase project setup
+2. Service account key for profile sync
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### Setup
 
-## Learn More
+1. **Firebase credentials:**
+   ```bash
+   # Get service account from Firebase Console
+   # Save as scripts/serviceAccountKey.json
+   ```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+2. **Environment:**
+   Firebase config is in `src/services/firebaseConfig.ts`
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+3. **Deploy:**
+   ```bash
+   npm run deploy
+   ```
 
-### Code Splitting
+   This automatically:
+   - Syncs all profiles from Firebase → static JSON
+   - Builds production bundle
+   - Deploys to Firebase Hosting
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## Scripts
 
-### Analyzing the Bundle Size
+| Command | Description |
+|---------|-------------|
+| `npm start` | Development server |
+| `npm run build` | Production build |
+| `npm run deploy` | Full deploy (sync + build + deploy) |
+| `npm run sync-profiles` | Sync profiles to static JSON |
+| `npm test` | Run tests |
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## Tech Stack
 
-### Making a Progressive Web App
+- **Frontend:** React 18, TypeScript
+- **Styling:** Tailwind CSS
+- **Backend:** Firebase (Firestore, Auth, Hosting, Storage)
+- **Build:** Create React App
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## Environment
 
-### Advanced Configuration
+- Node.js 18+
+- npm 9+
+- Firebase CLI
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+---
 
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+**Neoays Private Limited** | [neoays.com](https://neoays.com)
