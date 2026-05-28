@@ -1,4 +1,5 @@
 # nElite member instant redirects
+/crystalbullion https://ncard.neoays.com/crystalbullion 302
 
 # SPA Fallback Route
 /* /index.html 200

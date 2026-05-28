@@ -70,7 +70,7 @@ function generateProfileHTML(profile) {
     const isElite = profile.nEliteRedirectEnabled === true;
     const redirectTarget = isElite 
         ? `https://ncard.neoays.com/${profile.username}` 
-        : `${SITE_URL}/#/${profile.username}`;
+        : `/#/${profile.username}`;
 
     return `<!DOCTYPE html>
 <html lang="en">
